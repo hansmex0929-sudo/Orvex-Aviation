@@ -1,0 +1,53 @@
+name: Validate ORVEX static launcher
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  validate-links:
+    name: Validate canonical production links
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Validate launcher contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          node <<'NODE'
+          const fs = require('node:fs');
+
+          const html = fs.readFileSync('index.html', 'utf8');
+          const canonicalOrigin = 'https://www.orvex-aviation.com';
+          const required = [
+            '<link rel="canonical" href="https://www.orvex-aviation.com/" />',
+            `${canonicalOrigin}/dashboard?business=part-145`,
+            `${canonicalOrigin}/dashboard?business=rotor-blade-repair`,
+            `${canonicalOrigin}/dashboard?business=test-engine-repair`,
+            `${canonicalOrigin}/dashboard?business=parts-brokering`,
+            `${canonicalOrigin}/quant`,
+          ];
+
+          const missing = required.filter((value) => !html.includes(value));
+          if (missing.length > 0) {
+            throw new Error(`Missing canonical launcher targets: ${missing.join(', ')}`);
+          }
+
+          const forbidden = [
+            'href="/dashboard',
+            'href="/quant"',
+          ];
+          const invalid = forbidden.filter((value) => html.includes(value));
+          if (invalid.length > 0) {
+            throw new Error(`Root-relative application routes are not valid in the static launcher: ${invalid.join(', ')}`);
+          }
+
+          console.log('Static launcher routes only to canonical ORVEX production targets.');
+          NODE
