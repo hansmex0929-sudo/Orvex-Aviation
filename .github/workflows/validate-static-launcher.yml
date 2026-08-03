@@ -10,7 +10,7 @@ permissions:
 
 jobs:
   validate-links:
-    name: Validate canonical production links
+    name: Validate canonical production links and repository boundary
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -25,7 +25,9 @@ jobs:
           const fs = require('node:fs');
 
           const html = fs.readFileSync('index.html', 'utf8');
+          const readme = fs.readFileSync('README.md', 'utf8');
           const canonicalOrigin = 'https://www.orvex-aviation.com';
+          const canonicalRepo = 'hansmex0929-sudo/ORVEX-Aviation-AI-Enterprise';
           const required = [
             '<link rel="canonical" href="https://www.orvex-aviation.com/" />',
             `${canonicalOrigin}/dashboard?business=part-145`,
@@ -40,14 +42,39 @@ jobs:
             throw new Error(`Missing canonical launcher targets: ${missing.join(', ')}`);
           }
 
-          const forbidden = [
+          const forbiddenLinks = [
             'href="/dashboard',
             'href="/quant"',
           ];
-          const invalid = forbidden.filter((value) => html.includes(value));
-          if (invalid.length > 0) {
-            throw new Error(`Root-relative application routes are not valid in the static launcher: ${invalid.join(', ')}`);
+          const invalidLinks = forbiddenLinks.filter((value) => html.includes(value));
+          if (invalidLinks.length > 0) {
+            throw new Error(`Root-relative application routes are not valid in the static launcher: ${invalidLinks.join(', ')}`);
           }
 
-          console.log('Static launcher routes only to canonical ORVEX production targets.');
+          const requiredBoundaryText = [
+            'static compatibility launcher only',
+            canonicalRepo,
+            canonicalOrigin,
+          ];
+          const missingBoundaryText = requiredBoundaryText.filter((value) => !readme.includes(value));
+          if (missingBoundaryText.length > 0) {
+            throw new Error(`Missing legacy-repository boundary text: ${missingBoundaryText.join(', ')}`);
+          }
+
+          const forbiddenProductPaths = [
+            'src',
+            'app',
+            'components',
+            'package.json',
+            'package-lock.json',
+            'pnpm-lock.yaml',
+            'next.config.js',
+            'next.config.mjs',
+          ];
+          const unexpected = forbiddenProductPaths.filter((path) => fs.existsSync(path));
+          if (unexpected.length > 0) {
+            throw new Error(`Product implementation belongs in ${canonicalRepo}, not this static launcher: ${unexpected.join(', ')}`);
+          }
+
+          console.log('Static launcher routes only to canonical ORVEX production and preserves the legacy repository boundary.');
           NODE
